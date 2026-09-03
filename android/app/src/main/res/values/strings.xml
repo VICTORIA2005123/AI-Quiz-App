@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">AI Quiz Master</string>
+    <string name="generate_quiz">Generate Quiz</string>
+    <string name="generate_and_review">Generate &amp; Review</string>
+    <string name="cancel_job">Cancel Processing</string>
+    <string name="biometric_prompt_title">Unlock Secure Quizzes</string>
+    <string name="biometric_prompt_subtitle">Authenticate using your fingerprint or face to view confidential study materials.</string>
+</resources>
