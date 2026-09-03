@@ -1,27 +1,29 @@
 package com.aiquiz.app.presentation.screens.create
 
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 
@@ -32,6 +34,8 @@ fun CreateQuizScreen(
     onSubmitJob: (file: File, count: Int, difficulty: String, bloom: String, pii: Boolean, humanReview: Boolean) -> Unit
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
     var selectedFileUri by remember { mutableStateOf<Uri?>(null) }
     var selectedFileName by remember { mutableStateOf<String?>(null) }
     var questionCount by remember { mutableStateOf(5f) }
@@ -39,23 +43,46 @@ fun CreateQuizScreen(
     var bloomLevel by remember { mutableStateOf("mixed") }
     var enablePiiScrubbing by remember { mutableStateOf(true) }
     var humanReviewMode by remember { mutableStateOf(false) }
+    var isProcessingFile by remember { mutableStateOf(false) }
+
+    val supportedMimeTypes = arrayOf(
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "application/vnd.ms-powerpoint",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.ms-excel",
+        "text/plain",
+        "text/markdown",
+        "text/csv",
+        "text/html",
+        "image/*",
+        "*/*"
+    )
 
     val filePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
+        contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         if (uri != null) {
-            selectedFileUri = uri
-            val cursor = context.contentResolver.query(uri, null, null, null, null)
-            cursor?.use {
-                if (it.moveToFirst()) {
-                    val nameIndex = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                    if (nameIndex != -1) {
-                        selectedFileName = it.getString(nameIndex)
+            try {
+                selectedFileUri = uri
+                var resolvedName: String? = null
+                try {
+                    val cursor = context.contentResolver.query(uri, null, null, null, null)
+                    cursor?.use {
+                        if (it.moveToFirst()) {
+                            val nameIndex = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                            if (nameIndex != -1) {
+                                resolvedName = it.getString(nameIndex)
+                            }
+                        }
                     }
-                }
-            }
-            if (selectedFileName == null) {
-                selectedFileName = "document_${System.currentTimeMillis()}"
+                } catch (_: Exception) { }
+
+                selectedFileName = resolvedName ?: "document_${System.currentTimeMillis()}"
+            } catch (e: Exception) {
+                Toast.makeText(context, "Could not open file: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -66,7 +93,7 @@ fun CreateQuizScreen(
                 title = { Text("Generate Grounded Quiz", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 }
             )
@@ -89,7 +116,11 @@ fun CreateQuizScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable {
-                        filePickerLauncher.launch("*/*")
+                        try {
+                            filePickerLauncher.launch(supportedMimeTypes)
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Error launching file picker: ${e.message}", Toast.LENGTH_SHORT).show()
+                        }
                     }
             ) {
                 Column(
@@ -100,7 +131,7 @@ fun CreateQuizScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Icon(
-                        imageVector = if (selectedFileUri != null) Icons.Default.InsertDriveFile else Icons.Default.CloudUpload,
+                        imageVector = if (selectedFileUri != null) Icons.AutoMirrored.Filled.InsertDriveFile else Icons.Default.CloudUpload,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(48.dp)
@@ -223,35 +254,62 @@ fun CreateQuizScreen(
             // Submit Button
             Button(
                 onClick = {
-                    if (selectedFileUri != null) {
-                        // Copy Uri to temp file for upload
-                        val tempFile = File(context.cacheDir, selectedFileName ?: "upload.bin")
-                        context.contentResolver.openInputStream(selectedFileUri!!)?.use { input ->
-                            FileOutputStream(tempFile).use { output ->
-                                input.copyTo(output)
+                    val uri = selectedFileUri
+                    if (uri != null && !isProcessingFile) {
+                        isProcessingFile = true
+                        coroutineScope.launch {
+                            try {
+                                val tempFile = withContext(Dispatchers.IO) {
+                                    val safeFileName = selectedFileName ?: "upload.bin"
+                                    val destination = File(context.cacheDir, safeFileName)
+                                    context.contentResolver.openInputStream(uri)?.use { input ->
+                                        FileOutputStream(destination).use { output ->
+                                            input.copyTo(output)
+                                        }
+                                    } ?: throw IllegalStateException("Unable to read selected file stream.")
+                                    destination
+                                }
+                                onSubmitJob(
+                                    tempFile,
+                                    questionCount.toInt(),
+                                    difficulty,
+                                    bloomLevel,
+                                    enablePiiScrubbing,
+                                    humanReviewMode
+                                )
+                            } catch (e: Exception) {
+                                Toast.makeText(
+                                    context,
+                                    "Error preparing file: ${e.localizedMessage ?: "Unknown error"}",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            } finally {
+                                isProcessingFile = false
                             }
                         }
-                        onSubmitJob(
-                            tempFile,
-                            questionCount.toInt(),
-                            difficulty,
-                            bloomLevel,
-                            enablePiiScrubbing,
-                            humanReviewMode
-                        )
                     }
                 },
-                enabled = selectedFileUri != null,
+                enabled = selectedFileUri != null && !isProcessingFile,
                 modifier = Modifier.fillMaxWidth().height(54.dp),
                 shape = RoundedCornerShape(16.dp)
             ) {
-                Icon(Icons.Default.AutoAwesome, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = if (humanReviewMode) "Generate & Review" else "Generate Grounded Quiz",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                if (isProcessingFile) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Preparing Document...", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                } else {
+                    Icon(Icons.Default.AutoAwesome, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (humanReviewMode) "Generate & Review" else "Generate Grounded Quiz",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
     }

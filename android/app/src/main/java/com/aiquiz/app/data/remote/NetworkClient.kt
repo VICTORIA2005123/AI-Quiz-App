@@ -43,7 +43,11 @@ object NetworkClient {
             .writeTimeout(60, TimeUnit.SECONDS)
             .build()
 
-        val baseUrl = if (prefs.getServerUrl().endsWith("/")) prefs.getServerUrl() else "${prefs.getServerUrl()}/"
+        var rawUrl = prefs.getServerUrl().trim()
+        if (!rawUrl.startsWith("http://") && !rawUrl.startsWith("https://")) {
+            rawUrl = "http://$rawUrl"
+        }
+        val baseUrl = if (rawUrl.endsWith("/")) rawUrl else "$rawUrl/"
 
         val retrofit = Retrofit.Builder()
             .baseUrl(baseUrl)
