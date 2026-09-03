@@ -1,9 +1,9 @@
-# Privacy Policy: AI Quiz Master
+# Privacy Policy: SmartStudy AI
 
 **Last Updated:** August 30, 2026
 
 ## 1. Introduction
-AI Quiz Master ("we", "our", or "the App") is committed to protecting your privacy. This Privacy Policy explains how our native Android application and FastAPI backend handle your documents and data.
+SmartStudy AI ("we", "our", or "the App") is committed to protecting your privacy. This Privacy Policy explains how our native Android application and FastAPI backend handle your documents and data.
 
 ## 2. Ephemeral Document Processing Policy
 - **No Document Retention:** When you upload documents (PDF, DOCX, PPTX, XLSX, CSV, TXT, MD, HTML, or images) to generate a quiz, the document is transmitted via encrypted HTTPS/TLS 1.3 to our secure backend.

@@ -40,7 +40,7 @@ fun HomeScreen(
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary
                         )
-                        Text("AI Quiz Master", fontWeight = FontWeight.Bold)
+                        Text("SmartStudy AI", fontWeight = FontWeight.Bold)
                     }
                 },
                 actions = {

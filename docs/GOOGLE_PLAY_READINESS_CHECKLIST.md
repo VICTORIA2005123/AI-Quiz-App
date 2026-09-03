@@ -1,6 +1,6 @@
 # Google Play Production-Readiness Checklist & Compliance Guide
 
-This document specifies the technical configurations, Play Console Data Safety entries, and compliance requirements to ensure **AI Quiz Master** passes Google Play Store production reviews.
+This document specifies the technical configurations, Play Console Data Safety entries, and compliance requirements to ensure **SmartStudy AI** passes Google Play Store production reviews.
 
 ---
 

@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">AI Quiz Master</string>
+    <string name="app_name">SmartStudy AI</string>
     <string name="generate_quiz">Generate Quiz</string>
     <string name="generate_and_review">Generate &amp; Review</string>
     <string name="cancel_job">Cancel Processing</string>
