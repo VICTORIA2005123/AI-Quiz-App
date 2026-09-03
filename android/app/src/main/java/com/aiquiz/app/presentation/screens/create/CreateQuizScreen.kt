@@ -1,5 +1,7 @@
 package com.aiquiz.app.presentation.screens.create
 
+import android.app.Activity
+import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -62,27 +64,30 @@ fun CreateQuizScreen(
     )
 
     val filePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            try {
-                selectedFileUri = uri
-                var resolvedName: String? = null
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val uri = result.data?.data
+            if (uri != null) {
                 try {
-                    val cursor = context.contentResolver.query(uri, null, null, null, null)
-                    cursor?.use {
-                        if (it.moveToFirst()) {
-                            val nameIndex = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                            if (nameIndex != -1) {
-                                resolvedName = it.getString(nameIndex)
+                    selectedFileUri = uri
+                    var resolvedName: String? = null
+                    try {
+                        val cursor = context.contentResolver.query(uri, null, null, null, null)
+                        cursor?.use {
+                            if (it.moveToFirst()) {
+                                val nameIndex = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                                if (nameIndex != -1) {
+                                    resolvedName = it.getString(nameIndex)
+                                }
                             }
                         }
-                    }
-                } catch (_: Exception) { }
+                    } catch (_: Exception) { }
 
-                selectedFileName = resolvedName ?: "document_${System.currentTimeMillis()}"
-            } catch (e: Exception) {
-                Toast.makeText(context, "Could not open file: ${e.message}", Toast.LENGTH_SHORT).show()
+                    selectedFileName = resolvedName ?: "document_${System.currentTimeMillis()}"
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Could not open file: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
@@ -117,9 +122,26 @@ fun CreateQuizScreen(
                     .fillMaxWidth()
                     .clickable {
                         try {
-                            filePickerLauncher.launch(supportedMimeTypes)
+                            val openDocIntent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                                addCategory(Intent.CATEGORY_OPENABLE)
+                                type = "*/*"
+                                putExtra(Intent.EXTRA_MIME_TYPES, supportedMimeTypes)
+                            }
+                            filePickerLauncher.launch(openDocIntent)
                         } catch (e: Exception) {
-                            Toast.makeText(context, "Error launching file picker: ${e.message}", Toast.LENGTH_SHORT).show()
+                            try {
+                                val getContentIntent = Intent(Intent.ACTION_GET_CONTENT).apply {
+                                    type = "*/*"
+                                    putExtra(Intent.EXTRA_MIME_TYPES, supportedMimeTypes)
+                                }
+                                filePickerLauncher.launch(getContentIntent)
+                            } catch (fallbackEx: Exception) {
+                                Toast.makeText(
+                                    context,
+                                    "Error launching file picker: ${fallbackEx.localizedMessage}",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
                         }
                     }
             ) {

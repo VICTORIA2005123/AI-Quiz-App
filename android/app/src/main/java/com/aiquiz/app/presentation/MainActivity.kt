@@ -1,5 +1,6 @@
 package com.aiquiz.app.presentation
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -20,6 +21,19 @@ import com.aiquiz.app.presentation.navigation.AppNavGraph
 import com.aiquiz.app.presentation.theme.AIQuizTheme
 
 class MainActivity : FragmentActivity() {
+
+    override fun startActivityForResult(intent: Intent, requestCode: Int, options: Bundle?) {
+        try {
+            super.startActivityForResult(intent, requestCode, options)
+        } catch (e: IllegalArgumentException) {
+            if (e.message?.contains("16 bits", ignoreCase = true) == true) {
+                // Safely mask requestCode to lower 16 bits for FragmentActivity compatibility
+                super.startActivityForResult(intent, requestCode and 0xFFFF, options)
+            } else {
+                throw e
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
