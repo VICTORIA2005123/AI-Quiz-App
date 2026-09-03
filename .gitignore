@@ -57,8 +57,9 @@ local.properties
 *.dex
 captures/
 .externalNativeBuild/
-.cxx/
-output-metadata.json
+*.hprof
+*.log
+
 
 # IDEs & Editors
 .idea/
