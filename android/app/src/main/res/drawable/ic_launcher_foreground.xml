@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Central Glowing Core Circle -->
+    <path
+        android:pathData="M54,54m-28,0a28,28 0 1,0 56,0a28,28 0 1,0 -56,0"
+        android:fillColor="#6366F1"
+        android:fillAlpha="0.25" />
+
+    <!-- Open Book / Study Emblem -->
+    <path
+        android:pathData="M54,66 C48,60 38,58 30,60 L30,42 C38,40 48,42 54,48 C60,42 70,40 78,42 L78,60 C70,58 60,60 54,66 Z"
+        android:fillColor="#6366F1" />
+
+    <path
+        android:pathData="M54,64 C48,59 39,57 32,59 L32,44 C39,42 48,44 54,49 C60,44 69,42 76,44 L76,59 C69,57 60,59 54,64 Z"
+        android:fillColor="#38BDF8" />
+
+    <!-- Center Book Spine Line -->
+    <path
+        android:pathData="M54,49 L54,66"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round" />
+
+    <!-- AI Spark Stars (Top Center Spark) -->
+    <path
+        android:pathData="M54,26 L56,33 L63,35 L56,37 L54,44 L52,37 L45,35 L52,33 Z"
+        android:fillColor="#FBBF24" />
+
+    <!-- Small Spark Right -->
+    <path
+        android:pathData="M74,31 L75.5,35.5 L80,37 L75.5,38.5 L74,43 L72.5,38.5 L68,37 L72.5,35.5 Z"
+        android:fillColor="#38BDF8" />
+
+    <!-- Small Spark Left -->
+    <path
+        android:pathData="M34,33 L35,36 L38,37 L35,38 L34,41 L33,38 L30,37 L33,36 Z"
+        android:fillColor="#10B981" />
+</vector>
