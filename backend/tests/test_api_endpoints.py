@@ -97,3 +97,23 @@ def test_job_cancellation_flow(client: TestClient):
     # Cancel job
     cancel_resp = client.post(f"/api/v1/jobs/{job_id}/cancel", headers=headers)
     assert cancel_resp.status_code in [200, 400]  # 200 if cancelled in time, 400 if already finished immediately
+
+
+def test_guest_mobile_submission_flow(client: TestClient):
+    # Test unauthenticated document upload from mobile app
+    doc_content = "Guest user document notes on basic arithmetic. Addition and subtraction are inverse operations."
+    file_bytes = io.BytesIO(doc_content.encode("utf-8"))
+    files = {"file": ("math_notes.txt", file_bytes, "text/plain")}
+    data = {"question_count": 2, "difficulty": "easy", "bloom_level": "remember"}
+
+    submit_resp = client.post("/api/v1/jobs", files=files, data=data)
+    assert submit_resp.status_code == 202
+    job_info = submit_resp.json()
+    job_id = job_info["job_id"]
+    assert job_id is not None
+
+    time.sleep(1.0)
+    poll_resp = client.get(f"/api/v1/jobs/{job_id}")
+    assert poll_resp.status_code == 200
+    assert poll_resp.json()["job_id"] == job_id
+

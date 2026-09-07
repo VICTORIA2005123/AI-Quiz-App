@@ -63,32 +63,43 @@ fun CreateQuizScreen(
         "*/*"
     )
 
-    val filePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            val uri = result.data?.data
-            if (uri != null) {
-                try {
-                    selectedFileUri = uri
-                    var resolvedName: String? = null
-                    try {
-                        val cursor = context.contentResolver.query(uri, null, null, null, null)
-                        cursor?.use {
-                            if (it.moveToFirst()) {
-                                val nameIndex = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                                if (nameIndex != -1) {
-                                    resolvedName = it.getString(nameIndex)
-                                }
-                            }
-                        }
-                    } catch (_: Exception) { }
+    val handleSelectedUri: (Uri) -> Unit = { uri ->
+        try {
+            selectedFileUri = uri
+            val mimeType = context.contentResolver.getType(uri)
+            val extFromMime = if (mimeType != null) {
+                android.webkit.MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType)
+            } else null
 
-                    selectedFileName = resolvedName ?: "document_${System.currentTimeMillis()}"
-                } catch (e: Exception) {
-                    Toast.makeText(context, "Could not open file: ${e.message}", Toast.LENGTH_SHORT).show()
+            var resolvedName: String? = null
+            try {
+                val cursor = context.contentResolver.query(uri, null, null, null, null)
+                cursor?.use {
+                    if (it.moveToFirst()) {
+                        val nameIndex = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                        if (nameIndex != -1) {
+                            resolvedName = it.getString(nameIndex)
+                        }
+                    }
                 }
+            } catch (_: Exception) { }
+
+            if (resolvedName.isNullOrEmpty()) {
+                resolvedName = uri.lastPathSegment?.substringAfterLast('/')
             }
+
+            if (resolvedName != null) {
+                if (!resolvedName!!.contains(".") && !extFromMime.isNullOrEmpty()) {
+                    resolvedName = "$resolvedName.$extFromMime"
+                }
+            } else {
+                val fallbackExt = extFromMime ?: "pdf"
+                resolvedName = "document_${System.currentTimeMillis()}.$fallbackExt"
+            }
+
+            selectedFileName = resolvedName
+        } catch (e: Exception) {
+            Toast.makeText(context, "Could not process selected file: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -121,27 +132,15 @@ fun CreateQuizScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable {
-                        try {
-                            val openDocIntent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                                addCategory(Intent.CATEGORY_OPENABLE)
-                                type = "*/*"
-                                putExtra(Intent.EXTRA_MIME_TYPES, supportedMimeTypes)
-                            }
-                            filePickerLauncher.launch(openDocIntent)
-                        } catch (e: Exception) {
-                            try {
-                                val getContentIntent = Intent(Intent.ACTION_GET_CONTENT).apply {
-                                    type = "*/*"
-                                    putExtra(Intent.EXTRA_MIME_TYPES, supportedMimeTypes)
+                        val mainActivity = context as? com.aiquiz.app.presentation.MainActivity
+                        if (mainActivity != null) {
+                            mainActivity.launchDocumentPicker { uri ->
+                                if (uri != null) {
+                                    handleSelectedUri(uri)
                                 }
-                                filePickerLauncher.launch(getContentIntent)
-                            } catch (fallbackEx: Exception) {
-                                Toast.makeText(
-                                    context,
-                                    "Error launching file picker: ${fallbackEx.localizedMessage}",
-                                    Toast.LENGTH_SHORT
-                                ).show()
                             }
+                        } else {
+                            Toast.makeText(context, "Activity context unavailable", Toast.LENGTH_SHORT).show()
                         }
                     }
             ) {
@@ -282,15 +281,17 @@ fun CreateQuizScreen(
                         coroutineScope.launch {
                             try {
                                 val tempFile = withContext(Dispatchers.IO) {
-                                    val safeFileName = selectedFileName ?: "upload.bin"
-                                    val destination = File(context.cacheDir, safeFileName)
+                                    val candidateName = selectedFileName ?: "document_${System.currentTimeMillis()}.txt"
+                                    val safeFileName = if (!candidateName.contains(".")) "$candidateName.txt" else candidateName
+                                    val sanitized = safeFileName.replace("[^a-zA-Z0-9._-]".toRegex(), "_")
+                                    val destination = File(context.cacheDir, sanitized)
                                     context.contentResolver.openInputStream(uri)?.use { input ->
-                                        FileOutputStream(destination).use { output ->
-                                            input.copyTo(output)
-                                        }
-                                    } ?: throw IllegalStateException("Unable to read selected file stream.")
-                                    destination
-                                }
+                                         FileOutputStream(destination).use { output ->
+                                             input.copyTo(output)
+                                         }
+                                     } ?: throw IllegalStateException("Unable to read selected file stream.")
+                                     destination
+                                 }
                                 onSubmitJob(
                                     tempFile,
                                     questionCount.toInt(),

@@ -18,7 +18,7 @@ class Settings(BaseSettings):
 
     # AI Provider
     AI_PROVIDER: str = "gemini"
-    AI_MODEL: str = "gemini-2.0-flash"
+    AI_MODEL: str = "gemini-3.6-flash"
     AI_MOCK_MODEL: str = "local-mock-v1"
     GEMINI_API_KEY: str = ""
 

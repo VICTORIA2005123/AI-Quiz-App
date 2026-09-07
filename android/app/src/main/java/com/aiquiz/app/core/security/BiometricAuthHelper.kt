@@ -1,17 +1,29 @@
 package com.aiquiz.app.core.security
 
-import androidx.biometric.BiometricManager
-import androidx.biometric.BiometricPrompt
+import android.app.Activity
+import android.content.Context
+import android.hardware.biometrics.BiometricManager
+import android.hardware.biometrics.BiometricPrompt
+import android.os.Build
+import android.os.CancellationSignal
 import androidx.core.content.ContextCompat
-import androidx.fragment.app.FragmentActivity
 
-class BiometricAuthHelper(private val activity: FragmentActivity) {
+class BiometricAuthHelper(private val activity: Activity) {
 
     fun isBiometricAvailable(): Boolean {
-        val biometricManager = BiometricManager.from(activity)
-        return biometricManager.canAuthenticate(
-            BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
-        ) == BiometricManager.BIOMETRIC_SUCCESS
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val biometricManager = activity.getSystemService(Context.BIOMETRIC_SERVICE) as? BiometricManager
+            biometricManager?.canAuthenticate(
+                BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+            ) == BiometricManager.BIOMETRIC_SUCCESS
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val biometricManager = androidx.biometric.BiometricManager.from(activity)
+            biometricManager.canAuthenticate(
+                androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG or androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
+            ) == androidx.biometric.BiometricManager.BIOMETRIC_SUCCESS
+        } else {
+            false
+        }
     }
 
     fun promptBiometric(
@@ -20,26 +32,45 @@ class BiometricAuthHelper(private val activity: FragmentActivity) {
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
-        val executor = ContextCompat.getMainExecutor(activity)
-        val callback = object : BiometricPrompt.AuthenticationCallback() {
-            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                super.onAuthenticationSucceeded(result)
-                onSuccess()
-            }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val executor = ContextCompat.getMainExecutor(activity)
+            val prompt = BiometricPrompt.Builder(activity)
+                .setTitle(title)
+                .setSubtitle(subtitle)
+                .apply {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        setAllowedAuthenticators(
+                            BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+                        )
+                    } else {
+                        setNegativeButton("Cancel", executor) { _, _ -> onError("Authentication cancelled") }
+                    }
+                }
+                .build()
 
-            override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                super.onAuthenticationError(errorCode, errString)
-                onError(errString.toString())
-            }
+            val cancellationSignal = CancellationSignal()
+            prompt.authenticate(
+                cancellationSignal,
+                executor,
+                object : BiometricPrompt.AuthenticationCallback() {
+                    override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult?) {
+                        super.onAuthenticationSucceeded(result)
+                        onSuccess()
+                    }
+
+                    override fun onAuthenticationError(errorCode: Int, errString: CharSequence?) {
+                        super.onAuthenticationError(errorCode, errString)
+                        onError(errString?.toString() ?: "Authentication error")
+                    }
+
+                    override fun onAuthenticationFailed() {
+                        super.onAuthenticationFailed()
+                        onError("Authentication failed")
+                    }
+                }
+            )
+        } else {
+            onSuccess()
         }
-
-        val prompt = BiometricPrompt(activity, executor, callback)
-        val promptInfo = BiometricPrompt.PromptInfo.Builder()
-            .setTitle(title)
-            .setSubtitle(subtitle)
-            .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL)
-            .build()
-
-        prompt.authenticate(promptInfo)
     }
 }
